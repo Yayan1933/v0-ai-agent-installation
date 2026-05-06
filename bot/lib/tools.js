@@ -227,6 +227,68 @@ export function buildTools(ctx) {
     },
   })
 
+  // Tool untuk generate & explain code
+  const generateCode = tool({
+    description:
+      "Generate code snippet berdasarkan deskripsi. Gunakan untuk membantu user menulis code.",
+    inputSchema: z.object({
+      language: z.string().describe("Bahasa programming: python, javascript, typescript, go, bash, sql, dll"),
+      description: z.string().describe("Deskripsi apa yang harus dilakukan code tersebut"),
+      context: z.string().nullable().describe("Context tambahan seperti framework yang dipakai, null jika tidak ada"),
+    }),
+    execute: async ({ language, description, context }) => {
+      // Tool ini sebenarnya tidak generate sendiri, tapi membantu AI untuk struktur jawaban
+      return {
+        instruction: `Generate ${language} code untuk: ${description}`,
+        context: context || "none",
+        format: "Berikan code dalam codeblock dengan penjelasan singkat",
+      }
+    },
+  })
+
+  const analyzeCode = tool({
+    description:
+      "Analisis code yang diberikan user. Cek bug, optimasi, security issue, atau jelaskan cara kerjanya.",
+    inputSchema: z.object({
+      code: z.string().describe("Code yang akan dianalisis"),
+      task: z.enum(["review", "explain", "debug", "optimize", "security"]).describe("Jenis analisis"),
+    }),
+    execute: async ({ code, task }) => {
+      const taskMap = {
+        review: "Review code: cari bug, bad practices, dan improvement",
+        explain: "Jelaskan cara kerja code ini step-by-step",
+        debug: "Identifikasi bug atau error dalam code",
+        optimize: "Sarankan optimasi untuk performa atau readability",
+        security: "Cek potential security vulnerability",
+      }
+      return {
+        code: code.slice(0, 2000),
+        analysis_type: task,
+        instruction: taskMap[task],
+      }
+    },
+  })
+
+  const calculate = tool({
+    description: "Hitung ekspresi matematika. Gunakan untuk kalkulasi angka.",
+    inputSchema: z.object({
+      expression: z.string().describe("Ekspresi matematika, contoh: '(100 * 1.1) + 50' atau '2^10'"),
+    }),
+    execute: async ({ expression }) => {
+      try {
+        // Sanitize: hanya izinkan angka, operator, kurung, titik
+        const sanitized = expression.replace(/[^0-9+\-*/().^\s]/g, "")
+        // Ganti ^ dengan ** untuk power
+        const jsExpr = sanitized.replace(/\^/g, "**")
+        // Evaluate dengan Function (lebih aman dari eval)
+        const result = new Function(`return (${jsExpr})`)()
+        return { expression, result: Number(result) }
+      } catch (err) {
+        return { expression, error: "Ekspresi tidak valid" }
+      }
+    },
+  })
+
   return {
     execShell,
     webSearch,
@@ -235,5 +297,8 @@ export function buildTools(ctx) {
     listReminders,
     completeReminder,
     deleteReminder,
+    generateCode,
+    analyzeCode,
+    calculate,
   }
 }
