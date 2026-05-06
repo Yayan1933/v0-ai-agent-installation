@@ -1,0 +1,26 @@
+{
+  "name": "telegram-ai-agent",
+  "version": "1.0.0",
+  "description": "AI agent untuk Telegram dengan tools: search, scrape, exec, reminders. Deploy di VPS pakai PM2.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop telegram-ai-agent",
+    "pm2:restart": "pm2 restart telegram-ai-agent",
+    "pm2:logs": "pm2 logs telegram-ai-agent"
+  },
+  "dependencies": {
+    "ai": "^6.0.0",
+    "grammy": "^1.30.0",
+    "zod": "^3.23.8",
+    "cheerio": "^1.0.0",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
