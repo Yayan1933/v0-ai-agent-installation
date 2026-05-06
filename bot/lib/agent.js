@@ -1,13 +1,17 @@
-// AI Agent dengan ToolLoopAgent dari AI SDK 6
+// AI Agent dengan multi-provider support
 import { generateText, stepCountIs } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { buildTools } from "./tools.js"
 import { getHistory, appendHistory } from "./storage.js"
+import { selectModel } from "./models.js"
 
-const MODEL = process.env.AI_MODEL || "openai/gpt-5-mini"
+// OpenAI direct provider (jika tidak pakai Vercel Gateway)
+const openaiDirect = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "",
+})
 
 function buildSystemPrompt() {
   const now = new Date()
-  // Format waktu WIB untuk membantu agent parse "besok jam 9 pagi" dll
   const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000)
   return `Kamu adalah asisten pribadi yang membantu user lewat Telegram. Kamu berjalan di VPS milik user.
 
@@ -30,16 +34,31 @@ Waktu sekarang (WIB): ${wib.toISOString().replace("Z", "+07:00")}`
 }
 
 /**
+ * Resolve model berdasarkan provider
+ */
+function resolveModel(modelId, provider) {
+  if (provider === "openai") {
+    // Direct OpenAI (tanpa Vercel Gateway)
+    return openaiDirect(modelId)
+  }
+  // Default: Vercel AI Gateway (pass string langsung)
+  return modelId
+}
+
+/**
  * Jalankan agent untuk satu pesan user.
  */
 export async function runAgent({ userId, chatId, userMessage }) {
   const history = await getHistory(userId)
   const tools = buildTools({ chatId })
 
+  // Pilih model berdasarkan mode & kompleksitas
+  const { model: modelId, provider, reason } = selectModel(userMessage)
+
   const messages = [...history, { role: "user", content: userMessage }]
 
   const result = await generateText({
-    model: MODEL,
+    model: resolveModel(modelId, provider),
     system: buildSystemPrompt(),
     messages,
     tools,
@@ -48,12 +67,14 @@ export async function runAgent({ userId, chatId, userMessage }) {
 
   const finalText = result.text || "(tidak ada jawaban)"
 
-  // Simpan history (user message + assistant final text only, tanpa tool calls untuk hemat token)
+  // Simpan history
   await appendHistory(userId, { role: "user", content: userMessage })
   await appendHistory(userId, { role: "assistant", content: finalText })
 
   return {
     text: finalText,
     steps: result.steps?.length || 0,
+    model: modelId,
+    reason,
   }
 }

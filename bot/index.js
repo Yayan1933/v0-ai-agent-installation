@@ -3,6 +3,7 @@ import "dotenv/config"
 import { Bot } from "grammy"
 import { runAgent } from "./lib/agent.js"
 import { clearHistory } from "./lib/storage.js"
+import { listModels, selectModel } from "./lib/models.js"
 import { startScheduler } from "./lib/scheduler.js"
 
 // ===== Validasi env =====
@@ -68,6 +69,8 @@ bot.command("start", async (ctx) => {
       "Perintah:",
       "/clear - hapus history percakapan",
       "/whoami - tampilkan ID Telegram Anda",
+      "/models - lihat model AI tersedia",
+      "/mode - info mode AI (hemat/standar/premium/auto)",
       "",
       "Langsung kirim pesan saja untuk mulai!",
     ].join("\n"),
@@ -85,6 +88,28 @@ bot.command("clear", async (ctx) => {
 bot.command("whoami", async (ctx) => {
   await ctx.reply(
     `ID: \`${ctx.from.id}\`\nUsername: @${ctx.from.username || "-"}\nChat ID: \`${ctx.chat.id}\``,
+    { parse_mode: "Markdown" },
+  )
+})
+
+// /models - list available models
+bot.command("models", async (ctx) => {
+  const current = selectModel("")
+  const text = listModels() + `\n\n_Aktif:_ \`${current.model}\` (${current.reason})`
+  await ctx.reply(text, { parse_mode: "Markdown" })
+})
+
+// /mode - switch mode cepat
+bot.command("mode", async (ctx) => {
+  await ctx.reply(
+    `*Mode AI:*
+• \`hemat\` - Model termurah (Gemini Flash)
+• \`standar\` - Balance harga/kualitas (GPT-4o-mini)
+• \`premium\` - Model terbaik (Claude Sonnet)
+• \`auto\` - Otomatis pilih berdasarkan kompleksitas
+
+_Set di .env:_ \`AI_MODE=hemat\`
+_Aktif sekarang:_ \`${process.env.AI_MODE || "standar"}\``,
     { parse_mode: "Markdown" },
   )
 })
@@ -114,7 +139,7 @@ bot.on("message:text", async (ctx) => {
       // Fallback tanpa markdown jika parsing gagal
       await ctx.reply(text)
     }
-    console.log(`[msg] -> respond (${result.steps} steps, ${text.length} chars)`)
+    console.log(`[msg] -> respond (${result.model}, ${result.steps} steps)`)
   } catch (err) {
     clearInterval(typingInterval)
     console.error("[msg] Error:", err)
@@ -128,9 +153,10 @@ bot.catch((err) => {
 })
 
 // ===== Start =====
+const startupModel = selectModel("")
 console.log("[bot] Starting...")
 console.log(`[bot] Allowed IDs: ${ALLOWED_IDS.join(", ") || "(none)"}`)
-console.log(`[bot] Model: ${process.env.AI_MODEL || "openai/gpt-5-mini"}`)
+console.log(`[bot] Mode: ${process.env.AI_MODE || "standar"} | Model: ${startupModel.model}`)
 
 startScheduler(bot)
 
