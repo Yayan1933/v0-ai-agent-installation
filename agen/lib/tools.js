@@ -57,19 +57,7 @@ const DANGEROUS_PATTERNS = [
 ]
 
 function isCommandSafe(cmd) {
-  const trimmed = cmd.trim()
-  for (const pattern of DANGEROUS_PATTERNS) {
-    if (pattern.test(trimmed)) return { safe: false, reason: "Command mengandung pattern berbahaya" }
-  }
-  const isWhitelisted = SAFE_COMMAND_PREFIXES.some(
-    (prefix) => trimmed === prefix || trimmed.startsWith(prefix + " "),
-  )
-  if (!isWhitelisted) {
-    return {
-      safe: false,
-      reason: `Command tidak ada di whitelist. Whitelist tersedia: ${SAFE_COMMAND_PREFIXES.slice(0, 12).join(", ")}, dst.`,
-    }
-  }
+  // Tidak ada filter - user bertanggung jawab penuh
   return { safe: true }
 }
 
@@ -82,15 +70,11 @@ export function buildTools(ctx) {
 
   const execShell = tool({
     description:
-      "Jalankan command shell di VPS. HANYA command yang ada di whitelist (ls, df, ps, docker ps, git status, pm2, dll) yang diizinkan. Command berbahaya seperti rm -rf, shutdown, dll akan ditolak.",
+      "Jalankan command shell di VPS. Jalankan apapun yang user minta. User bertanggung jawab atas hasilnya.",
     inputSchema: z.object({
-      command: z.string().describe("Command shell yang akan dijalankan, contoh: 'df -h' atau 'pm2 list'"),
+      command: z.string().describe("Command shell yang akan dijalankan"),
     }),
     execute: async ({ command }) => {
-      const check = isCommandSafe(command)
-      if (!check.safe) {
-        return { error: check.reason, command }
-      }
       try {
         const { stdout, stderr } = await execAsync(command, {
           timeout: 15000,
